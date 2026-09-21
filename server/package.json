@@ -1,0 +1,14 @@
+{
+  "name": "@air-swarm/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@air-swarm/shared": "*",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>AIR SWARM</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="canvas-container"></div>
+
+    <div id="level-select-screen" class="modal-screen">
+      <div class="title">AIR<span>SWARM</span></div>
+      <div class="subtitle">select a mission</div>
+      <div id="profile-display-panel" class="profile-panel">
+        CALLSIGN: <span id="profile-name">Marine</span> &middot; PERSISTENT POINTS: <span id="profile-points">0</span>
+      </div>
+
+      <div class="level-picker">
+        <div class="level-card" data-level="1">
+          <div class="level-card-name">LANDING ZONE</div>
+          <div class="level-card-difficulty easy">EASY</div>
+          <div class="level-card-desc">Short route &middot; 1 locked door</div>
+        </div>
+        <div class="level-card" data-level="2">
+          <div class="level-card-name">DEEP CORRIDOR</div>
+          <div class="level-card-difficulty medium">MEDIUM</div>
+          <div class="level-card-desc">Winding route &middot; 2 locked doors</div>
+        </div>
+        <div class="level-card" data-level="3">
+          <div class="level-card-name">THE GAUNTLET</div>
+          <div class="level-card-difficulty hard">HARD</div>
+          <div class="level-card-desc">Long route &middot; 3 locked doors &middot; toughest enemies</div>
+        </div>
+      </div>
+
+      <div class="hint">Pick a mission to continue &middot; if a match is already in progress you'll join that one instead</div>
+    </div>
+
+    <div id="join-screen" class="modal-screen hidden">
+      <div class="title">AIR<span>SWARM</span></div>
+      <div class="subtitle" id="selected-level-label">co-op top-down shooter</div>
+      <input id="name-input" type="text" placeholder="Callsign" maxlength="16" />
+
+      <div class="class-picker">
+        <label class="class-option">
+          <input type="radio" name="cls" value="marine" checked />
+          <span>MARINE</span>
+          <small>Assault Rifle &middot; deploys heal zone</small>
+        </label>
+        <label class="class-option">
+          <input type="radio" name="cls" value="engineer" />
+          <span>ENGINEER</span>
+          <small>Volt Carbine &middot; hacks &middot; deploys turret</small>
+        </label>
+        <label class="class-option">
+          <input type="radio" name="cls" value="heavy" />
+          <span>HEAVY</span>
+          <small>Heavy Repeater &middot; shotgun blast</small>
+        </label>
+        <label class="class-option">
+          <input type="radio" name="cls" value="medic" />
+          <span>MEDIC</span>
+          <small>Needler Carbine &middot; drops stim pack</small>
+        </label>
+      </div>
+
+      <button id="join-btn">DROP IN</button>
+      <div class="hint hint-desktop">WASD to move &middot; mouse to aim &middot; click to fire &middot; hold E to hack doors / revive downed teammates (medic) &middot; Q for class ability &middot; G to throw grenade (1/level)</div>
+      <div class="hint">No auto-respawn &mdash; a medic must hold E at your body for 15s to revive you</div>
+      <div class="hint hint-desktop">Controller: left stick move &middot; right stick aim &middot; RT fire &middot; LB hack/revive &middot; X ability &middot; A confirm &middot; bumpers cycle class</div>
+      <div class="hint hint-touch">Left stick moves &middot; right stick aims and fires &middot; HOLD button hacks/revives &middot; Q button is your class ability</div>
+      <div id="gamepad-status" class="gamepad-status hidden">&#127918; Controller Connected</div>
+    </div>
+
+    <div id="gameover-screen" class="modal-screen hidden">
+      <div class="title danger">MISSION FAILED</div>
+      <div class="subtitle">The team has been wiped out.</div>
+      <button id="gameover-btn">RETURN TO MAIN MENU</button>
+    </div>
+
+    <div id="victory-screen" class="modal-screen hidden">
+      <div class="title">MISSION <span>ACCOMPLISHED</span></div>
+      <div class="subtitle">You have successfully escaped!</div>
+      <button id="victory-btn">RETURN TO MAIN MENU</button>
+    </div>
+
+    <div id="hud-overlay" class="hidden">
+      <div id="damage-vignette"></div>
+      <div class="top-left-hud panel">
+        <div class="label">HP <span id="stim-tag" class="stim-tag hidden">STIM &#9889;</span></div>
+        <div class="hp-bar"><div id="hp-fill"></div></div>
+        <div id="hp-text" class="sub">100 / 100</div>
+      </div>
+
+      <div id="ability-hud" class="panel hidden">
+        <div id="ability-label" class="label">ABILITY</div>
+        <div class="ability-bar"><div id="ability-fill"></div></div>
+      </div>
+
+      <div id="grenade-hud" class="panel hidden">
+        <div id="grenade-label" class="label">GRENADE</div>
+        <div class="grenade-bar"><div id="grenade-fill"></div></div>
+      </div>
+
+      <div class="top-right-hud panel">
+        <div id="level-badge" class="label"></div>
+        <div id="wave-text" class="label">MOVE OUT</div>
+        <pre id="player-list" class="sub"></pre>
+      </div>
+
+      <div id="reticle"></div>
+
+      <div id="door-hint" class="panel hint-panel hidden"></div>
+      <div id="revive-hint" class="panel hint-panel hidden"></div>
+
+      <div id="dead-overlay" class="modal-screen hidden">
+        <div class="title">DOWN</div>
+        <div class="subtitle" id="dead-subtitle">Awaiting a medic...</div>
+        <div class="door-bar" id="dead-revive-bar"><div class="door-bar-fill hack" id="dead-revive-fill" style="width:0%"></div></div>
+      </div>
+
+      <div id="banner" class="hidden"></div>
+
+      <div id="touch-controls" class="hidden">
+        <div id="touch-move-zone" class="joystick-zone joystick-zone-left">
+          <div id="touch-move-base" class="joystick-base">
+            <div id="touch-move-knob" class="joystick-knob"></div>
+          </div>
+        </div>
+        <div id="touch-aim-zone" class="joystick-zone joystick-zone-right">
+          <div id="touch-aim-base" class="joystick-base">
+            <div id="touch-aim-knob" class="joystick-knob"></div>
+          </div>
+        </div>
+        <div id="touch-interact-btn" class="touch-btn touch-btn-interact">HOLD</div>
+        <div id="touch-ability-btn" class="touch-btn touch-btn-ability">Q</div>
+      </div>
+    </div>
+
+    <div id="sound-toggle" class="sound-toggle muted">
+      <span class="icon">🔇</span>
+      <span class="text">SOUND MUTED</span>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
