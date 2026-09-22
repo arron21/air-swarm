@@ -1047,7 +1047,6 @@ class GameEngine {
         const hitX = ev.x + ev.dx * ev.dist;
         const hitZ = ev.z + ev.dz * ev.dist;
         FX.wallRicochet(hitX, 0.95, hitZ, -ev.dx, -ev.dz);
-        FX.impactSpark(hitX, hitZ);
         audio.playSFX('shoot', shotFromTurret ? 'engineer' : cls);
       } else if (ev.type === 'enemyShot') {
         FX.muzzleFlash(ev.x, ev.z, ev.dx, ev.dz, [0.3, 1.0, 0.4]);
@@ -1304,8 +1303,8 @@ class GameEngine {
 
       // Ambient floating dust motes
       this._ambientDustTimer = (this._ambientDustTimer || 0) + dt;
-      if (this._ambientDustTimer >= 0.15) {
-        FX.ambientDust(this.predicted.x, this.predicted.z, 2);
+      if (this._ambientDustTimer >= 0.6) {
+        FX.ambientDust(this.predicted.x, this.predicted.z, 1);
         this._ambientDustTimer = 0;
       }
 

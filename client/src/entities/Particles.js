@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { attribute, pointUV, float, length, smoothstep } from 'three/tsl';
 
-const MAX_PARTICLES = 8000;
+const MAX_PARTICLES = 1500;
 
 class ParticlePool {
   constructor() {
@@ -20,6 +20,7 @@ class ParticlePool {
     this.baseSize = new Float32Array(MAX_PARTICLES);
     this.active = new Uint8Array(MAX_PARTICLES);
 
+    this.activeList = [];
     this._cursor = 0;
   }
 
@@ -56,7 +57,7 @@ class ParticlePool {
   //           posJitter:{x,y,z}, vyBias }
   spawnBurst(x, y, z, config) {
     const {
-      count = 12,
+      count = 10,
       color = [1, 1, 1],
       speed = [2, 5],
       spread = 1,
@@ -74,6 +75,11 @@ class ParticlePool {
     for (let i = 0; i < count; i++) {
       const idx = this._cursor;
       this._cursor = (this._cursor + 1) % MAX_PARTICLES;
+
+      if (!this.active[idx]) {
+        this.active[idx] = 1;
+        this.activeList.push(idx);
+      }
 
       let vx; let vy; let vz;
       if (dir) {
@@ -125,21 +131,27 @@ class ParticlePool {
       this.baseSize[idx] = size[0] + Math.random() * (size[1] - size[0]);
       this.sizes[idx] = this.baseSize[idx];
       this.alphas[idx] = 1;
-      this.active[idx] = 1;
+    }
+
+    if (this.points) {
+      this.points.geometry.attributes.aColor.needsUpdate = true;
     }
   }
 
   update(dt) {
-    let dirty = false;
-    for (let i = 0; i < MAX_PARTICLES; i++) {
-      if (!this.active[i]) continue;
-      dirty = true;
+    const len = this.activeList.length;
+    if (len === 0) return;
 
+    for (let j = len - 1; j >= 0; j--) {
+      const i = this.activeList[j];
       this.life[i] -= dt;
       if (this.life[i] <= 0) {
         this.active[i] = 0;
         this.alphas[i] = 0;
         this.sizes[i] = 0;
+        // Fast swap-pop removal O(1)
+        this.activeList[j] = this.activeList[this.activeList.length - 1];
+        this.activeList.pop();
         continue;
       }
 
@@ -174,9 +186,8 @@ class ParticlePool {
       }
     }
 
-    if (dirty && this.points) {
+    if (this.points) {
       this.points.geometry.attributes.position.needsUpdate = true;
-      this.points.geometry.attributes.aColor.needsUpdate = true;
       this.points.geometry.attributes.aSize.needsUpdate = true;
       this.points.geometry.attributes.aAlpha.needsUpdate = true;
     }
@@ -188,239 +199,233 @@ export const particles = new ParticlePool();
 // Named presets so call sites read like intent, not magic numbers.
 export const FX = {
   muzzleFlash: (x, z, dx, dz, color = [1, 0.92, 0.55]) => particles.spawnBurst(x, 1.0, z, {
-    count: 14, color, speed: [4, 9], life: [0.06, 0.14], size: [0.12, 0.22], gravity: 1, dir: { x: dx, z: dz }, spread: 0.35,
+    count: 8, color, speed: [4, 8], life: [0.05, 0.11], size: [0.1, 0.18], gravity: 1, dir: { x: dx, z: dz }, spread: 0.3,
   }),
   shellCasing: (x, y = 0.9, z, angle) => {
-    // Eject to the right flank of the gun (perpendicular to aiming angle)
     const rightX = Math.cos(angle);
     const rightZ = -Math.sin(angle);
     particles.spawnBurst(x, y, z, {
       count: 1,
       color: [0.95, 0.78, 0.25],
-      speed: [2.2, 3.8],
+      speed: [2.0, 3.5],
       dir: { x: rightX, z: rightZ },
-      spread: 0.25,
-      vyBias: 1.5,
+      spread: 0.2,
+      vyBias: 1.4,
       gravity: 12,
       bounce: 0.42,
-      life: [0.7, 1.2],
+      life: [0.6, 1.0],
       size: [0.07, 0.1],
     });
   },
   wallRicochet: (x, y = 1.0, z, nx = 0, nz = 0) => {
     // 1. High velocity fiery ricochet sparks
     particles.spawnBurst(x, y, z, {
-      count: 9,
+      count: 5,
       color: [1.0, 0.88, 0.45],
-      speed: [3.5, 7.5],
+      speed: [3.0, 6.5],
       dir: (nx !== 0 || nz !== 0) ? { x: nx, z: nz } : null,
-      spread: 0.4,
+      spread: 0.35,
       gravity: 7,
       bounce: 0.3,
-      life: [0.15, 0.35],
-      size: [0.06, 0.11],
+      life: [0.12, 0.28],
+      size: [0.06, 0.1],
     });
     // 2. Concrete pulverized debris chips
     particles.spawnBurst(x, y, z, {
-      count: 7,
+      count: 4,
       color: [0.45, 0.45, 0.42],
-      speed: [1.5, 3.8],
+      speed: [1.2, 3.0],
       dir: (nx !== 0 || nz !== 0) ? { x: nx, z: nz } : null,
-      spread: 0.6,
+      spread: 0.5,
       gravity: 9,
       bounce: 0.2,
       drag: 1.2,
-      growth: 1.0,
-      life: [0.3, 0.6],
-      size: [0.08, 0.16],
+      growth: 0.8,
+      life: [0.25, 0.45],
+      size: [0.07, 0.13],
     });
   },
   impactSpark: (x, z, hitColor = [1, 0.85, 0.4]) => particles.spawnBurst(x, 1.0, z, {
-    count: 8, color: hitColor, speed: [2, 5], life: [0.15, 0.3], size: [0.06, 0.12], gravity: 6,
+    count: 6, color: hitColor, speed: [2, 4.5], life: [0.12, 0.25], size: [0.06, 0.11], gravity: 6,
   }),
   enemyDeath: (x, z, color) => particles.spawnBurst(x, 0.7, z, {
-    count: 22, color, speed: [2, 6], life: [0.35, 0.7], size: [0.1, 0.22], gravity: 8, spread: 1,
+    count: 18, color, speed: [2, 5], life: [0.3, 0.6], size: [0.1, 0.2], gravity: 8, spread: 1,
   }),
   enemyHit: (x, z, color) => particles.spawnBurst(x, 0.8, z, {
-    count: 7, color, speed: [1.5, 4.5], life: [0.18, 0.38], size: [0.08, 0.14], gravity: 7,
+    count: 6, color, speed: [1.5, 4.0], life: [0.15, 0.32], size: [0.07, 0.13], gravity: 7,
   }),
   playerHit: (x, z) => particles.spawnBurst(x, 1.1, z, {
-    count: 10, color: [0.9, 0.15, 0.15], speed: [1.5, 4], life: [0.25, 0.45], size: [0.08, 0.15], gravity: 5,
+    count: 8, color: [0.9, 0.15, 0.15], speed: [1.5, 3.5], life: [0.2, 0.4], size: [0.08, 0.14], gravity: 5,
   }),
   doorSpark: (x, y, z) => particles.spawnBurst(x, y, z, {
-    count: 10, color: [1, 0.75, 0.3], speed: [2, 5], life: [0.15, 0.3], size: [0.06, 0.12], gravity: 6,
+    count: 8, color: [1, 0.75, 0.3], speed: [2, 4.5], life: [0.12, 0.25], size: [0.06, 0.11], gravity: 6,
   }),
   pickupHeal: (x, z) => particles.spawnBurst(x, 0.6, z, {
-    count: 16, color: [0.35, 0.9, 0.6], speed: [1, 3], life: [0.4, 0.7], size: [0.08, 0.16], gravity: -2,
+    count: 12, color: [0.35, 0.9, 0.6], speed: [1, 2.5], life: [0.35, 0.6], size: [0.08, 0.15], gravity: -2,
   }),
   pickupStim: (x, z) => particles.spawnBurst(x, 0.6, z, {
-    count: 16, color: [0.3, 0.82, 0.77], speed: [1, 3], life: [0.4, 0.7], size: [0.08, 0.16], gravity: -2,
+    count: 12, color: [0.3, 0.82, 0.77], speed: [1, 2.5], life: [0.35, 0.6], size: [0.08, 0.15], gravity: -2,
   }),
   turretDeploy: (x, z) => particles.spawnBurst(x, 0.3, z, {
-    count: 18, color: [0.6, 0.5, 0.75], speed: [1.5, 3.5], life: [0.3, 0.55], size: [0.1, 0.2], gravity: 3,
+    count: 14, color: [0.6, 0.5, 0.75], speed: [1.5, 3.0], life: [0.25, 0.45], size: [0.09, 0.18], gravity: 3,
   }),
   shotgunBlast: (x, z, angle) => particles.spawnBurst(x, 1.0, z, {
-    count: 30, color: [1, 0.55, 0.2], speed: [5, 11], life: [0.15, 0.35], size: [0.12, 0.24], gravity: 1,
-    dir: { x: Math.sin(angle), z: Math.cos(angle) }, spread: 0.75,
+    count: 20, color: [1, 0.55, 0.2], speed: [4, 9], life: [0.12, 0.28], size: [0.1, 0.2], gravity: 1,
+    dir: { x: Math.sin(angle), z: Math.cos(angle) }, spread: 0.65,
   }),
   enemySpawn: (x, z, color) => particles.spawnBurst(x, 0.5, z, {
-    count: 14, color, speed: [1.5, 4], life: [0.25, 0.5], size: [0.1, 0.18], gravity: 2,
+    count: 10, color, speed: [1.2, 3.5], life: [0.2, 0.4], size: [0.09, 0.16], gravity: 2,
   }),
 
   // Multi-stage explosion: fireball + billowing smoke + hot embers
   explosionDebris: (x, z, radius = 2.0) => {
-    // 1. Central fast expanding fireball
     particles.spawnBurst(x, 0.6, z, {
-      count: 24,
+      count: 16,
       color: [1.0, 0.65, 0.18],
-      speed: [radius * 2, radius * 4.5],
+      speed: [radius * 1.8, radius * 3.8],
       spread: 1,
       gravity: 1,
       drag: 3.2,
-      growth: 2.8,
-      life: [0.25, 0.45],
-      size: [0.2, 0.4],
+      growth: 2.5,
+      life: [0.2, 0.38],
+      size: [0.18, 0.35],
     });
-    // 2. Lingering smoke cloud billowing upwards
     particles.spawnBurst(x, 0.8, z, {
-      count: 18,
+      count: 12,
       color: [0.24, 0.22, 0.2],
-      speed: [1.2, 3.2],
+      speed: [1.0, 2.8],
       spread: 1,
       gravity: -0.8,
       drag: 2.2,
-      growth: 3.2,
-      life: [0.55, 1.1],
-      size: [0.26, 0.48],
+      growth: 2.8,
+      life: [0.45, 0.85],
+      size: [0.22, 0.4],
     });
-    // 3. Arcing high-speed shrapnel & embers with bounce
     particles.spawnBurst(x, 0.7, z, {
-      count: 22,
+      count: 16,
       color: [1.0, 0.88, 0.35],
-      speed: [radius * 2.5, radius * 6.5],
+      speed: [radius * 2.0, radius * 5.0],
       spread: 1,
       gravity: 9,
       bounce: 0.4,
-      life: [0.4, 0.85],
-      size: [0.08, 0.15],
+      life: [0.35, 0.7],
+      size: [0.07, 0.13],
     });
   },
 
   // Caustic acid spit projectile trails & impact splash
   acidTrail: (x, y = 0.9, z) => {
     particles.spawnBurst(x, y, z, {
-      count: 2,
+      count: 1,
       color: [0.45, 0.95, 0.25],
-      speed: [0.3, 1.0],
+      speed: [0.2, 0.8],
       spread: 1,
       gravity: 1.8,
       drag: 1.2,
       growth: 0.8,
-      life: [0.25, 0.5],
-      size: [0.09, 0.16],
+      life: [0.2, 0.4],
+      size: [0.08, 0.14],
     });
   },
   acidSplash: (x, z) => {
     particles.spawnBurst(x, 0.4, z, {
-      count: 16,
+      count: 12,
       color: [0.4, 1.0, 0.28],
-      speed: [2.5, 6.0],
+      speed: [2.2, 5.0],
       spread: 1,
       gravity: 8,
       bounce: 0.25,
-      life: [0.25, 0.5],
-      size: [0.1, 0.2],
+      life: [0.2, 0.4],
+      size: [0.09, 0.18],
     });
   },
 
   // Player movement & state FX
   footstep: (x, z) => {
     particles.spawnBurst(x, 0.05, z, {
-      count: 3,
+      count: 2,
       color: [0.38, 0.38, 0.4],
-      speed: [0.3, 1.0],
+      speed: [0.3, 0.8],
       spread: 1,
       gravity: -0.2,
       drag: 2.5,
-      growth: 1.5,
-      life: [0.2, 0.4],
-      size: [0.1, 0.16],
+      growth: 1.2,
+      life: [0.15, 0.3],
+      size: [0.08, 0.14],
     });
   },
   stimTrail: (x, z) => {
     particles.spawnBurst(x, 0.5, z, {
-      count: 3,
+      count: 2,
       color: [0.25, 0.95, 0.9],
-      speed: [0.6, 1.8],
+      speed: [0.5, 1.5],
       spread: 1,
       gravity: -1.0,
       drag: 1.5,
-      life: [0.2, 0.4],
-      size: [0.08, 0.15],
+      life: [0.15, 0.3],
+      size: [0.07, 0.13],
     });
   },
   criticalDamage: (x, z) => {
-    // Suit electrical discharge
     particles.spawnBurst(x, 0.9, z, {
-      count: 3,
+      count: 2,
       color: [0.4, 0.85, 1.0],
-      speed: [2.0, 4.5],
+      speed: [1.8, 3.8],
       spread: 1,
       gravity: 6,
       bounce: 0.3,
-      life: [0.1, 0.25],
-      size: [0.06, 0.12],
+      life: [0.08, 0.2],
+      size: [0.05, 0.1],
     });
-    // Blood vapor / suit venting
     particles.spawnBurst(x, 0.8, z, {
-      count: 2,
+      count: 1,
       color: [0.85, 0.12, 0.12],
-      speed: [0.5, 1.5],
+      speed: [0.4, 1.2],
       spread: 1,
       gravity: 2,
-      life: [0.25, 0.5],
-      size: [0.09, 0.16],
+      life: [0.2, 0.4],
+      size: [0.08, 0.14],
     });
   },
 
   // Atmospheric & Environmental FX
-  ambientDust: (cx, cz, count = 3) => {
+  ambientDust: (cx, cz, count = 1) => {
     particles.spawnBurst(cx, 1.2, cz, {
       count,
-      posJitter: { x: 18, y: 2.5, z: 18 },
+      posJitter: { x: 14, y: 2.0, z: 14 },
       color: [0.38, 0.42, 0.48],
-      speed: [0.05, 0.25],
+      speed: [0.05, 0.2],
       spread: 1,
       gravity: -0.05,
       drag: 0.2,
-      life: [2.5, 5.0],
-      size: [0.05, 0.11],
+      life: [2.0, 4.0],
+      size: [0.05, 0.09],
     });
   },
   steamVent: (x, y, z, nx = 0, nz = 0) => {
     particles.spawnBurst(x, y, z, {
-      count: 7,
+      count: 5,
       color: [0.55, 0.6, 0.65],
-      speed: [3.2, 5.8],
+      speed: [2.8, 4.8],
       dir: (nx !== 0 || nz !== 0) ? { x: nx, z: nz } : null,
-      spread: 0.32,
-      gravity: -1.2,
+      spread: 0.28,
+      gravity: -1.0,
       drag: 2.2,
-      growth: 2.8,
-      life: [0.45, 0.85],
-      size: [0.16, 0.3],
+      growth: 2.4,
+      life: [0.35, 0.7],
+      size: [0.14, 0.25],
     });
   },
   electricalSparks: (x, y, z) => {
     particles.spawnBurst(x, y, z, {
-      count: 6,
+      count: 4,
       color: [0.45, 0.85, 1.0],
-      speed: [2.5, 6.0],
+      speed: [2.0, 5.0],
       spread: 1,
       gravity: 7,
       bounce: 0.35,
-      life: [0.1, 0.25],
-      size: [0.06, 0.14],
+      life: [0.08, 0.2],
+      size: [0.05, 0.12],
     });
   },
   hackStream: (startX, startY, startZ, targetX, targetY, targetZ) => {
@@ -429,16 +434,16 @@ export const FX = {
     const dz = targetZ - startZ;
     const dist = Math.hypot(dx, dy, dz) || 1;
     particles.spawnBurst(startX, startY, startZ, {
-      count: 3,
+      count: 2,
       color: [0.2, 1.0, 0.75],
-      speed: [dist * 2.2, dist * 3.5],
+      speed: [dist * 2.0, dist * 3.2],
       dir: { x: dx / dist, z: dz / dist },
       vyBias: (dy / dist) * 1.5,
-      spread: 0.18,
+      spread: 0.15,
       gravity: 0,
       drag: 0.2,
-      life: [0.25, 0.45],
-      size: [0.07, 0.13],
+      life: [0.2, 0.4],
+      size: [0.06, 0.11],
     });
   },
   teleporterVortex: (x, z, radius = 1.6) => {
@@ -446,20 +451,19 @@ export const FX = {
     const r = Math.random() * radius * 0.8;
     const px = x + Math.cos(angle) * r;
     const pz = z + Math.sin(angle) * r;
-    // Tangent velocity to create swirling upward vortex
     const tanX = -Math.sin(angle);
     const tanZ = Math.cos(angle);
     particles.spawnBurst(px, 0.25, pz, {
-      count: 2,
+      count: 1,
       color: [0.15, 0.95, 0.9],
-      speed: [1.2, 2.5],
+      speed: [1.0, 2.2],
       dir: { x: tanX, z: tanZ },
-      vyBias: 2.2,
+      vyBias: 2.0,
       spread: 0.2,
       gravity: -3.0,
       drag: 0.5,
-      life: [0.5, 0.9],
-      size: [0.09, 0.18],
+      life: [0.4, 0.75],
+      size: [0.08, 0.15],
     });
   },
 };
