@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { FX } from './Particles.js';
 
 export class Projectile {
   constructor(id) {
@@ -18,9 +19,12 @@ export class Projectile {
   setPosition(x, z) {
     this.group.position.x = x;
     this.group.position.z = z;
+    FX.acidTrail(x, 0.9, z);
   }
 
   dispose(scene) {
+    FX.acidSplash(this.group.position.x, this.group.position.z);
     scene.remove(this.group);
   }
 }
+

@@ -827,6 +827,7 @@ class GameEngine {
       const p = this.getOrCreatePlayer(ps.id, ps.id === this.localId);
       p.cls = ps.cls;
       p.hp = ps.hp;
+      p.stim = !!ps.stim;
       p.alive = ps.alive;
       p.reviveProgress = ps.reviveProgress || 0;
       p.setDowned(!ps.alive);
@@ -1037,7 +1038,16 @@ class GameEngine {
 
         tracers.spawn(ev.x, ev.z, ev.dx, ev.dz, ev.dist);
         FX.muzzleFlash(ev.x, ev.z, ev.dx, ev.dz, shotFromTurret ? [0.4, 0.88, 1.0] : getMuzzleColor(cls));
-        FX.impactSpark(ev.x + ev.dx * ev.dist, ev.z + ev.dz * ev.dist);
+
+        // Spent brass shell casing ejected sideways
+        const shotAngle = Math.atan2(ev.dx, ev.dz);
+        FX.shellCasing(ev.x, 0.95, ev.z, shotAngle);
+
+        // Wall impact ricochet sparks and concrete dust
+        const hitX = ev.x + ev.dx * ev.dist;
+        const hitZ = ev.z + ev.dz * ev.dist;
+        FX.wallRicochet(hitX, 0.95, hitZ, -ev.dx, -ev.dz);
+        FX.impactSpark(hitX, hitZ);
         audio.playSFX('shoot', shotFromTurret ? 'engineer' : cls);
       } else if (ev.type === 'enemyShot') {
         FX.muzzleFlash(ev.x, ev.z, ev.dx, ev.dz, [0.3, 1.0, 0.4]);
@@ -1291,6 +1301,38 @@ class GameEngine {
       this.updateLocalPlayer(dt);
       this.smoothRemoteEntities(dt);
       this.updateCamera(dt);
+
+      // Ambient floating dust motes
+      this._ambientDustTimer = (this._ambientDustTimer || 0) + dt;
+      if (this._ambientDustTimer >= 0.15) {
+        FX.ambientDust(this.predicted.x, this.predicted.z, 2);
+        this._ambientDustTimer = 0;
+      }
+
+      // Environmental steam pipe vents and electrical conduit sparks
+      this._envFxTimer = (this._envFxTimer || 0) + dt;
+      if (this._envFxTimer >= 0.85) {
+        this._envFxTimer = 0;
+        if (this.guideLights && this.guideLights.length > 0) {
+          const nearby = [];
+          for (let i = 0; i < this.guideLights.length; i++) {
+            const light = this.guideLights[i];
+            const d = Math.hypot(light.position.x - this.predicted.x, light.position.z - this.predicted.z);
+            if (d < 24) nearby.push(light);
+          }
+          if (nearby.length > 0) {
+            const chosen = nearby[Math.floor(Math.random() * nearby.length)];
+            if (Math.random() < 0.5) {
+              FX.electricalSparks(chosen.position.x, chosen.position.y, chosen.position.z);
+            } else {
+              const nx = chosen.position.x - this.predicted.x;
+              const nz = chosen.position.z - this.predicted.z;
+              const len = Math.hypot(nx, nz) || 1;
+              FX.steamVent(chosen.position.x, chosen.position.y, chosen.position.z, -nx / len, -nz / len);
+            }
+          }
+        }
+      }
     }
 
     tracers.update(dt);
@@ -1347,6 +1389,19 @@ class GameEngine {
 
     const firing = input.firing || gamepad.firing || touchControls.firing;
     const hacking = input.hacking || gamepad.interacting || touchControls.interacting;
+
+    if (hacking) {
+      for (const [id, def] of this.doorDefs) {
+        const state = this.doorStates.get(id);
+        if (!state || state.open) continue;
+        const dist = Math.hypot(def.x - this.predicted.x, def.z - this.predicted.z);
+        if (dist <= DOOR.hackRange + 0.6) {
+          FX.hackStream(this.predicted.x, 0.85, this.predicted.z, def.x, 1.3, def.z);
+          break;
+        }
+      }
+    }
+
     net.sendInput(move.x, move.z, aim, firing, hacking);
     if (input.consumeAbilityPress() || gamepad.consumeAbilityPress() || touchControls.consumeAbilityPress()) net.sendAbility();
     if (input.consumeGrenadePress()) net.sendGrenade();

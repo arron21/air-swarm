@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { FX } from './Particles.js';
 
 const COLORS = [0x4fd1c5, 0xf6ad55, 0x9f7aea, 0xf56565];
 
@@ -393,7 +394,38 @@ export class Player {
       this._pulseT += dt * 4;
       this.beacon.material.opacity = 0.5 + Math.sin(this._pulseT) * 0.3;
       this.beaconLight.intensity = 1.2 + Math.sin(this._pulseT) * 0.6;
+    } else {
+      // 1. Footstep dust puffs when moving
+      const moved = Math.hypot(this.x - (this._lastX ?? this.x), this.z - (this._lastZ ?? this.z));
+      if (moved > 0.005) {
+        this._stepTimer = (this._stepTimer || 0) + dt;
+        if (this._stepTimer >= 0.16) {
+          FX.footstep(this.x, this.z);
+          this._stepTimer = 0;
+        }
+      }
+
+      // 2. Stim speed streaks
+      if (this.stim) {
+        this._stimTimer = (this._stimTimer || 0) + dt;
+        if (this._stimTimer >= 0.07) {
+          FX.stimTrail(this.x, this.z);
+          this._stimTimer = 0;
+        }
+      }
+
+      // 3. Critical damage suit sparks & blood vapor (< 30% HP)
+      if (this.hp < 30 && this.hp > 0) {
+        this._critTimer = (this._critTimer || 0) + dt;
+        if (this._critTimer >= 0.28) {
+          FX.criticalDamage(this.x, this.z);
+          this._critTimer = 0;
+        }
+      }
     }
+
+    this._lastX = this.x;
+    this._lastZ = this.z;
   }
 
   dispose(scene) {

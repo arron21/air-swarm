@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { TELEPORTER } from '@air-swarm/shared';
+import { FX } from './Particles.js';
 
 const COLOR_PRIMARY = 0x00ffff;
 const COLOR_SECONDARY = 0x4fd1c5;
@@ -81,6 +82,13 @@ export class Teleporter {
     // Rotate columns in opposite directions
     this.beam1.rotation.y += dt * 0.3;
     this.beam2.rotation.y -= dt * 0.45;
+
+    // Swirling upward energy vortex particles
+    this._particleTimer = (this._particleTimer || 0) + dt;
+    if (this._particleTimer >= 0.04) {
+      FX.teleporterVortex(this.group.position.x, this.group.position.z, TELEPORTER.radius);
+      this._particleTimer = 0;
+    }
   }
 
   dispose(scene) {

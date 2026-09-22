@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { FX } from './Particles.js';
 
 class ExplosionPool {
   constructor() {
@@ -10,6 +11,8 @@ class ExplosionPool {
   }
 
   spawn(x, z, radius) {
+    FX.explosionDebris(x, z, radius);
+
     const geom = new THREE.RingGeometry(0.1, radius, 24);
     const mat = new THREE.MeshBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geom, mat);
