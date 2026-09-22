@@ -193,11 +193,7 @@ export class Player {
     spikeGeom.translate(0, 0, 0.13);
     this.muzzleFlash.add(new THREE.Mesh(spikeGeom, this.muzzleFlashMat));
 
-    this.muzzleLight = new THREE.PointLight(0xffcc44, 0, 5.5);
-    this.muzzleLight.position.set(0, 0, 0.15);
-    this.muzzleFlash.add(this.muzzleLight);
-
-    this.muzzleFlash.visible = false;
+    this.muzzleFlash.scale.set(0, 0, 0);
     this.muzzleFlashTimer = 0;
 
     // 3. Name Label Sprite
@@ -283,8 +279,7 @@ export class Player {
 
     if (downed) {
       if (this.muzzleFlash) {
-        this.muzzleFlash.visible = false;
-        this.muzzleLight.intensity = 0;
+        this.muzzleFlash.scale.set(0, 0, 0);
         this.muzzleFlashTimer = 0;
       }
       // Downed state: fall over, gray out armor, disable visor glow, hide gun
@@ -351,42 +346,29 @@ export class Player {
   triggerMuzzleFlash(cls = 'marine') {
     if (this.downed || !this.muzzleFlash) return;
     this.muzzleFlashTimer = 0.06;
-    this.muzzleFlash.visible = true;
 
     this.muzzleFlash.rotation.z = Math.random() * Math.PI * 2;
-    const scale = 0.85 + Math.random() * 0.35;
-    this.muzzleFlash.scale.set(scale, scale, scale);
+    let scale = 0.85 + Math.random() * 0.35;
 
     let flashColor = 0xffea60;
-    let lightColor = 0xffcc44;
-    let lightIntensity = 4.5;
-
     if (cls === 'engineer') {
       flashColor = 0x66e0ff;
-      lightColor = 0x22ccff;
-      lightIntensity = 4.0;
     } else if (cls === 'heavy') {
       flashColor = 0xff6622;
-      lightColor = 0xff4400;
-      lightIntensity = 6.0;
-      this.muzzleFlash.scale.multiplyScalar(1.3);
+      scale *= 1.3;
     } else if (cls === 'medic') {
       flashColor = 0x44ffaa;
-      lightColor = 0x20e080;
-      lightIntensity = 3.8;
     }
 
     this.muzzleFlashMat.color.setHex(flashColor);
-    this.muzzleLight.color.setHex(lightColor);
-    this.muzzleLight.intensity = lightIntensity;
+    this.muzzleFlash.scale.set(scale, scale, scale);
   }
 
   update(dt) {
     if (this.muzzleFlashTimer > 0) {
       this.muzzleFlashTimer -= dt;
       if (this.muzzleFlashTimer <= 0) {
-        if (this.muzzleFlash) this.muzzleFlash.visible = false;
-        if (this.muzzleLight) this.muzzleLight.intensity = 0;
+        if (this.muzzleFlash) this.muzzleFlash.scale.set(0, 0, 0);
       }
     }
 

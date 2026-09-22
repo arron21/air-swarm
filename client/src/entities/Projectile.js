@@ -9,11 +9,8 @@ export class Projectile {
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.y = 0.9;
 
-    const light = new THREE.PointLight(0xb388ff, 1.0, 2.5);
-    light.position.y = 0.9;
-
     this.group = new THREE.Group();
-    this.group.add(this.mesh, light);
+    this.group.add(this.mesh);
   }
 
   setPosition(x, z) {

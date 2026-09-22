@@ -20,11 +20,7 @@ class ExplosionPool {
     mesh.position.set(x, 0.15, z);
     this.scene.add(mesh);
 
-    const light = new THREE.PointLight(0xff8a3d, 3, radius * 2.5);
-    light.position.set(x, 1, z);
-    this.scene.add(light);
-
-    this.active.push({ mesh, light, life: 0.35, maxLife: 0.35, radius });
+    this.active.push({ mesh, life: 0.35, maxLife: 0.35, radius });
   }
 
   update(dt) {
@@ -34,9 +30,8 @@ class ExplosionPool {
       const t = 1 - Math.max(0, e.life) / e.maxLife;
       e.mesh.scale.setScalar(0.3 + t * 0.7);
       e.mesh.material.opacity = 0.85 * (1 - t);
-      e.light.intensity = 3 * (1 - t);
       if (e.life <= 0) {
-        this.scene.remove(e.mesh, e.light);
+        this.scene.remove(e.mesh);
         e.mesh.geometry.dispose();
         e.mesh.material.dispose();
         this.active.splice(i, 1);
