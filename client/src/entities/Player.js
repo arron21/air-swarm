@@ -193,7 +193,7 @@ export class Player {
     spikeGeom.translate(0, 0, 0.13);
     this.muzzleFlash.add(new THREE.Mesh(spikeGeom, this.muzzleFlashMat));
 
-    this.muzzleFlash.scale.set(0, 0, 0);
+    this.muzzleFlash.visible = false;
     this.muzzleFlashTimer = 0;
 
     // 3. Name Label Sprite
@@ -362,13 +362,14 @@ export class Player {
 
     this.muzzleFlashMat.color.setHex(flashColor);
     this.muzzleFlash.scale.set(scale, scale, scale);
+    this.muzzleFlash.visible = true;
   }
 
   update(dt) {
     if (this.muzzleFlashTimer > 0) {
       this.muzzleFlashTimer -= dt;
       if (this.muzzleFlashTimer <= 0) {
-        if (this.muzzleFlash) this.muzzleFlash.scale.set(0, 0, 0);
+        if (this.muzzleFlash) this.muzzleFlash.visible = false;
       }
     }
 

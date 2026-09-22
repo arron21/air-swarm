@@ -147,7 +147,7 @@ export class Turret {
     this.turretMuzzleFlash.add(new THREE.Mesh(tSpikeGeom, this.turretMuzzleFlashMat));
 
     this.head.add(this.turretMuzzleFlash);
-    this.turretMuzzleFlash.scale.set(0, 0, 0);
+    this.turretMuzzleFlash.visible = false;
     this.turretMuzzleTimer = 0;
     this._barrelSide = 0;
   }
@@ -158,7 +158,7 @@ export class Turret {
 
   triggerMuzzleFlash() {
     this.turretMuzzleTimer = 0.06;
-    this.turretMuzzleFlash.scale.set(1, 1, 1);
+    this.turretMuzzleFlash.visible = true;
     this._barrelSide = 1 - this._barrelSide;
     const xOff = this._barrelSide === 0 ? -0.13 : 0.13;
     this.turretMuzzleFlash.position.set(xOff, 0.11, 0.72);
@@ -169,7 +169,7 @@ export class Turret {
     if (this.turretMuzzleTimer > 0) {
       this.turretMuzzleTimer -= dt;
       if (this.turretMuzzleTimer <= 0) {
-        this.turretMuzzleFlash.scale.set(0, 0, 0);
+        this.turretMuzzleFlash.visible = false;
       }
     }
 
